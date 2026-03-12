@@ -1,8 +1,18 @@
 package main
 
-import "fmt"
+import (
+	//"fmt"
+	"log"
+
+	"github.com/Prathamesh0415/fileserver/p2p"
+) 
 
 func main(){
-	fmt.Print("Welcome to FileServer Project\n")
+	tr := p2p.NewTCPTransport(":4000")
+	if err := tr.ListenAndAccept(); err != nil {
+		log.Fatal((err))
+	}
+
+	select {}
 }
 

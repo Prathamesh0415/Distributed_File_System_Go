@@ -69,19 +69,22 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 	fmt.Printf("new connection at %v\n", peer)
 
 	if err := t.HandshakeFunc(peer); err != nil {
-
+		conn.Close()
+		fmt.Printf("TCP Handshake error :%s\n", err)
+		return
 	}
 
-	// msg := &temp{};
-	buf := make([]byte, 1024)
+	msg := &Message{};
+	//buf := make([]byte, 1024)
 	for {
 
-		n, err := conn.Read(buf)
+		err := t.Decoder.Decode(conn, msg)
+		//n, err := conn.Read(buf)
 		if err != nil {
 			fmt.Printf("TCP Error: %s\n", err)
 		}
-
-		fmt.Printf("%v\n", buf[:n])
+		msg.From = conn.RemoteAddr()
+		fmt.Printf("Message: %v\n", msg)
 		// if err := t.Decoder.Decode(conn, msg); err != nil {
 		// 	fmt.Printf("TCP Error: %s", err);
 		// 	continue;

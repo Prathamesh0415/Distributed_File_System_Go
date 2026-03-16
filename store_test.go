@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"fmt"
 	"io"
 	//"io/ioutil"
@@ -49,6 +48,9 @@ func TestStore(t *testing.T){
 	r, err := s.Read(key)
 	if err != nil {
 		t.Error(err)
+	}
+	if ok := s.Has(key); !ok {
+		t.Errorf("expected to hace key %s", key)
 	}
 	buf, err := io.ReadAll(r)
 	fmt.Println(string(buf))

@@ -85,10 +85,11 @@ func (s *Store) Has(key string) bool {
 	path := s.PathTransformFunc(key)
 	fullpathWithRoot := fmt.Sprintf("%s/%s", s.Root, path.Fullpath())
 	_, err := os.Stat(fullpathWithRoot)
-	if errors.Is(err, os.ErrNotExist) {
-		return false
-	}
-	return true
+	return !errors.Is(err, os.ErrNotExist)
+}
+
+func (s *Store) Clear() error {
+	return os.RemoveAll(s.Root)
 }
 
 func (s *Store) Delete(key string) error {

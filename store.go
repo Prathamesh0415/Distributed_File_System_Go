@@ -46,6 +46,10 @@ type PathKey struct {
 	Filename string
 }
 
+func (s * Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
+}
+
 func (p PathKey) FirstPathName() string {
 	path := strings.Split(p.Pathname, "/")
 	if len(path) == 0 {

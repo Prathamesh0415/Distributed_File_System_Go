@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	//"sync"
@@ -54,15 +55,24 @@ func (t *TCPTransport) ListenAndAccept() error{
 		return err
 	} 
 
+	fmt.Printf("TCP Server listening on port: %s\n", t.ListenAddress)
+
 	go t.startAcceptLoop()
 
 	return nil
 }
 
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+
+}
+
 func (t *TCPTransport) startAcceptLoop() {
 	for{
 		conn, err := t.listener.Accept()
-
+		if errors.Is(err, net.ErrClosed) {
+			return 
+		}
 		if err != nil {
 			fmt.Printf("Error at start accept loop function: %s\n", err)
 		}
@@ -101,6 +111,7 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		}
 		rpc.From = conn.RemoteAddr()
 		t.rpcch <- rpc
+	
 	}
 }
 

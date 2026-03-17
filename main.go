@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"log"
+	"time"
 
 	"github.com/Prathamesh0415/fileserver/p2p"
 ) 
@@ -13,24 +14,28 @@ func OnPeer(peer p2p.Peer) error {
 }
 
 func main(){
-	tr := p2p.NewTCPTransport(p2p.TCPTransportOpts{
-		ListenAddress: ":4000",
+	tcpTransportOpts := p2p.TCPTransportOpts{
+		ListenAddress: ":3000",
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder: p2p.DefaultDecoder{},
-		OnPeer: OnPeer,
-	})
+	}
+	tcpTransport := p2p.NewTCPTransport(tcpTransportOpts)
 
-	go func(){
-		for{
-			msg := <-tr.Consume()
-			fmt.Printf("%v\n", msg)
-		}
+	fileServerOpts := FileServerOpts{
+		StorageRoot: "3000_network",
+		PathTransformFunc: CASPathTransformFunc,
+		Transport: tcpTransport,
+	}
+	FileServer := NewFileServer(fileServerOpts)
+
+	go func() {
+		time.Sleep(time.Second * 3)
+		FileServer.Stop()
 	}()
 
-	if err := tr.ListenAndAccept(); err != nil {
-		log.Fatal((err))
+	if err := FileServer.Start(); err != nil {
+		log.Fatal(err)
 	}
 
-	select {}
 }
 

@@ -29,6 +29,17 @@ func (p *TCPPeer) Close() error {
 	return p.conn.Close()
 }
 
+func (t *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	go t.handleConn(conn, true)
+
+	return nil
+} 
+
 func (r *TCPTransport) Consume() <- chan RPC{
 	return r.rpcch 
 }
@@ -77,11 +88,15 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("Error at start accept loop function: %s\n", err)
 		}
 
-		go t.handleConn(conn)
+		fmt.Printf("new connection at %v\n", conn)
+
+		go t.handleConn(conn, true)
 	}
 }
 
-func (t *TCPTransport) handleConn(conn net.Conn) {
+
+
+func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error
 
 	defer func(){
@@ -89,8 +104,8 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		conn.Close()
 	}()
 	
-	peer := NewTCPPeer(conn, true)
-	//fmt.Printf("new connection at %v\n", peer)
+	peer := NewTCPPeer(conn, outbound)
+	
 
 	if err = t.HandshakeFunc(peer); err != nil {
 		return

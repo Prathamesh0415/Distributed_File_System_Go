@@ -1,8 +1,12 @@
 package p2p
 
+import "net"
+
 // Represents a remote node
 type Peer interface{
+	RemoteAddr() net.Addr
 	Close() error
+	send([]byte) error
 }
 
 // handles connection between nodes

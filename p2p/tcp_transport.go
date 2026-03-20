@@ -73,6 +73,8 @@ func (t *TCPTransport) ListenAndAccept() error{
 	return nil
 }
 
+
+
 func (t *TCPTransport) Close() error {
 	return t.listener.Close()
 
@@ -88,13 +90,19 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("Error at start accept loop function: %s\n", err)
 		}
 
-		fmt.Printf("new connection at %v\n", conn)
-
 		go t.handleConn(conn, true)
 	}
 }
 
 
+func (p *TCPPeer) send(b []byte) error {
+	_, err := p.conn.Write(b)
+	return err
+}
+
+func (p *TCPPeer) RemoteAddr() net.Addr {
+	return p.conn.RemoteAddr()
+}
 
 func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error

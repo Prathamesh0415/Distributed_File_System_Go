@@ -8,10 +8,6 @@ import (
 	"github.com/Prathamesh0415/fileserver/p2p"
 ) 
 
-func OnPeer(peer p2p.Peer) error {
-	peer.Close()
-	return nil
-}
 
 func makeServer(listenAddr string, nodes ...string) *FileServer{
 	tcpTransportOpts := p2p.TCPTransportOpts{
@@ -27,7 +23,10 @@ func makeServer(listenAddr string, nodes ...string) *FileServer{
 		Transport: tcpTransport,
 		BootstrapNodes: nodes,
 	}
-	return NewFileServer(fileServerOpts)
+
+	f := NewFileServer(fileServerOpts)
+	tcpTransport.OnPeer = f.OnPeer 
+	return f
 }
 
 func main(){

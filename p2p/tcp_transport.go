@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	//"sync"
 )
 
 type TCPPeer struct{
-	conn net.Conn
+	net.Conn
 	outbound bool
+	Wg *sync.WaitGroup
 }
 
 type TCPTransportOpts struct {
@@ -25,9 +27,15 @@ type TCPTransport struct {
 	rpcch chan RPC
 }
 
-func (p *TCPPeer) Close() error {
-	return p.conn.Close()
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
+	return &TCPPeer{
+		Conn: conn,
+		outbound: outbound,
+		Wg: &sync.WaitGroup{},
+	}
 }
+
+
 
 func (t *TCPTransport) Dial(addr string) error {
 	conn, err := net.Dial("tcp", addr)
@@ -44,12 +52,6 @@ func (r *TCPTransport) Consume() <- chan RPC{
 	return r.rpcch 
 }
 
-func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer{
-	return &TCPPeer{
-		conn: conn,
-		outbound: outbound,
-	}
-}
 
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
@@ -95,14 +97,11 @@ func (t *TCPTransport) startAcceptLoop() {
 }
 
 
-func (p *TCPPeer) send(b []byte) error {
-	_, err := p.conn.Write(b)
+func (p *TCPPeer) Send(b []byte) error {
+	_, err := p.Write(b)
 	return err
 }
 
-func (p *TCPPeer) RemoteAddr() net.Addr {
-	return p.conn.RemoteAddr()
-}
 
 func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error
@@ -132,8 +131,11 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 		if err != nil {
 			return
 		}
-		rpc.From = conn.RemoteAddr()
+		rpc.From = conn.RemoteAddr().String()
+		peer.Wg.Add(1)
 		t.rpcch <- rpc
+		peer.Wg.Wait()
+		fmt.Print("Contiuning the read loop\n")
 	
 	}
 }

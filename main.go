@@ -2,7 +2,10 @@ package main
 
 import (
 	//"fmt"
+	"bytes"
 	"log"
+	"time"
+
 	//"time"
 
 	"github.com/Prathamesh0415/fileserver/p2p"
@@ -35,7 +38,11 @@ func main(){
 	go func() {
 		log.Fatal(s1.Start())	
 	}()
-	s2.Start()
+	go s2.Start()
+	time.Sleep(time.Second * 2)
+	data := bytes.NewReader([]byte("Some big data file"))
+	s2.StoreData("data", data)	
+	select{}
 }
 
 

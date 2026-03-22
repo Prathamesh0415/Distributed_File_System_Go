@@ -46,7 +46,7 @@ type PathKey struct {
 	Filename string
 }
 
-func (s * Store) Write(key string, r io.Reader) error {
+func (s * Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
@@ -124,23 +124,23 @@ func (s *Store) readStream(key string) (r io.ReadCloser, err error){
 	return os.Open(fullpathWithRoot)
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathkey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.Pathname)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 
 	fullpathWithRoot := fmt.Sprintf("%s/%s",s.Root, pathkey.Fullpath())
 
 	f, err := os.Create(fullpathWithRoot)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	log.Printf("%d bytes copied to disk: %s\n", n, fullpathWithRoot);
-	return nil
+	return n, nil
 }

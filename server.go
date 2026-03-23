@@ -29,7 +29,7 @@ type FileServer struct {
 	peerLock sync.Mutex
 	peers map[string]p2p.Peer
 
-	Store *Store
+	store *Store
 	quitch chan struct{}
 }
 
@@ -43,6 +43,10 @@ type MessageStoreFile struct {
 	Size int64
 }
 
+type MessageGetFile struct {
+	Key string
+}
+
 func NewFileServer(opts FileServerOpts) *FileServer {
 	storeOpts := StoreOpts{
 		Root:              opts.StorageRoot,
@@ -51,10 +55,48 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 
 	return &FileServer{
 		FileServerOpts: opts,
-		Store:          NewStore(storeOpts),
+		store:          NewStore(storeOpts),
 		quitch: 		make(chan struct{}),
 		peers: 			make(map[string]p2p.Peer),
 	}
+}
+
+
+
+func (f *FileServer) MessageGetFile() error {
+	return nil
+}
+
+func (f *FileServer) Get(key string) (io.Reader, error) {
+	if f.store.Has(key) {
+		return f.store.Read(key)
+	}
+
+	fmt.Printf("File not present locally connecting to network: \n")
+
+	msg := Message{
+		Payload: MessageGetFile{
+			Key: key,
+		},
+	}
+
+	if err := f.broadcast(&msg); err != nil {
+		return nil, err
+	}
+
+	for _, peer := range f.peers {
+		fileBuffer := new(bytes.Buffer)
+		n, err := io.Copy(fileBuffer, peer)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Printf("received %d bytes over the network\n", n)
+		fmt.Println(string(fileBuffer.Bytes()))
+	}
+
+	select {}
+
+	return nil, nil
 }
 
 func (f *FileServer) OnPeer(p p2p.Peer) error {
@@ -82,11 +124,10 @@ func (f *FileServer) loop() {
 			case rpc := <- f.Transport.Consume():
 				var msg Message
 				if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
-					log.Println(err)
+					log.Println("decoding error: ", err)
 				}
 				if err := f.handleMessage(rpc.From, &msg); err != nil {
-					fmt.Println(err)
-					return
+					log.Println("handle message error: ", err)
 				}
 
 				// fmt.Printf("received: %+v\n", msg)
@@ -111,6 +152,8 @@ func (f *FileServer) handleMessage(from string,msg *Message) error {
 	switch v := msg.Payload.(type) {
 	case MessageStoreFile:
 		return f.handleMessageStoreFile(from, v)
+	case MessageGetFile:
+		return f.handleMessageGetFile(from, v)
 	}
 	return nil
 }
@@ -120,13 +163,34 @@ func (f *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 	if !ok {
 		return fmt.Errorf("peer %s not present in peer map", from)
 	}
-	n, err := f.Store.Write(msg.Key, io.LimitReader(peer, msg.Size)) 
+	n, err := f.store.Write(msg.Key, io.LimitReader(peer, msg.Size)) 
 	if err != nil {
 		return err
 	}
 	fmt.Printf("%d written to disk \n", n)
 	peer.(*p2p.TCPPeer).Wg.Done()
 	return nil 
+}
+
+func (f *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error {
+	if !f.store.Has(msg.Key) {
+		return fmt.Errorf("Cannot read file %s from disk\n", msg.Key)
+	}
+	fmt.Printf("Got file %s serving file over the network\n", msg.Key)
+	r, err := f.store.Read(msg.Key)
+	if err != nil {
+		return err
+	}
+	peer, ok := f.peers[from]
+	if !ok {
+		return fmt.Errorf("peer %s is not present in the map\n", from)
+	}
+	n, err := io.Copy(peer, r)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("written %d byted over the network to %s\n", n, from)
+	return nil
 }
 
 
@@ -148,7 +212,7 @@ func (f *FileServer) bootstrapNetwork() error {
 
 
 
-func (f *FileServer) broadcast(p *Message) error {
+func (f *FileServer) stream(p *Message) error {
 	peers := []io.Writer{}
 	for _, peer := range f.peers {
 		peers = append(peers, peer)
@@ -157,12 +221,28 @@ func (f *FileServer) broadcast(p *Message) error {
 	return gob.NewEncoder(mu).Encode(p)
 }
 
+func (f *FileServer) broadcast(msg *Message) error {
+	MsgBuf := new(bytes.Buffer)
+	
+	if err := gob.NewEncoder(MsgBuf).Encode(msg); err != nil {
+		return err
+	}
+
+	for _, peer := range f.peers {
+		if err := peer.Send(MsgBuf.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 
-func (f *FileServer) StoreData(key string, r io.Reader) error {
+
+func (f *FileServer) Store(key string, r io.Reader) error {
 	FileBuffer := new(bytes.Buffer)
 	tee := io.TeeReader(r, FileBuffer)	
-	n, err := f.Store.Write(key, tee)
+	n, err := f.store.Write(key, tee)
 	if err != nil {
 		return err
 	}
@@ -182,7 +262,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	// 	Payload: p,
 	// })
 
-	MsgBuf := new(bytes.Buffer)
+	
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key: key,
@@ -190,15 +270,9 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 		},
 	}
 
-	if err := gob.NewEncoder(MsgBuf).Encode(msg); err != nil {
+	if err := f.broadcast(&msg); err != nil {
 		return err
-	}
-
-	for _, peer := range f.peers {
-		if err := peer.Send(MsgBuf.Bytes()); err != nil {
-			return err
-		}
-	}
+	}	
 
 	time.Sleep(time.Second * 3)
 
@@ -232,4 +306,5 @@ func (f *FileServer) Start() error {
 
 func init() {
 	gob.Register(MessageStoreFile{})
+	gob.Register(MessageGetFile{})
 }

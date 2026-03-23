@@ -3,6 +3,8 @@ package main
 import (
 	//"fmt"
 	"bytes"
+	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -40,8 +42,16 @@ func main(){
 	}()
 	go s2.Start()
 	time.Sleep(time.Second * 2)
-	data := bytes.NewReader([]byte("Some big data file"))
-	s2.StoreData("data", data)	
+	// data := bytes.NewReader([]byte("Some big data file"))
+	// s2.Store("data", data)
+	
+	r, err :=s2.Get("data")
+	if err != nil {
+		fmt.Println(err)
+	}
+	buf := new(bytes.Buffer)
+	io.Copy(buf, r)
+	fmt.Println(string(buf.Bytes()))
 	select{}
 }
 

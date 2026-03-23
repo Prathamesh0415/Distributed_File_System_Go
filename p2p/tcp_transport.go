@@ -131,12 +131,16 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 		if err != nil {
 			return
 		}
+
 		rpc.From = conn.RemoteAddr().String()
-		peer.Wg.Add(1)
+		if rpc.Stream {
+			peer.Wg.Add(1)
+			fmt.Printf("%s Incoming stream waiting.... \n", conn.RemoteAddr())
+			peer.Wg.Wait()
+			fmt.Printf("%s Stream closed, resuming read loop\n", conn.RemoteAddr())
+			continue	
+		} 
 		t.rpcch <- rpc
-		peer.Wg.Wait()
-		fmt.Print("Contiuning the read loop\n")
-	
 	}
 }
 

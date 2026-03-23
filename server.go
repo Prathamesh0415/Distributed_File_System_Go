@@ -81,18 +81,24 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 	}
 
 	if err := f.broadcast(&msg); err != nil {
+		//f.peer.Send([]byte{p2p.IncomingMessage})
 		return nil, err
 	}
 
+	time.Sleep(time.Second * 3)
+
 	for _, peer := range f.peers {
 		fileBuffer := new(bytes.Buffer)
-		n, err := io.Copy(fileBuffer, peer)
+		n, err := io.CopyN(fileBuffer, peer, 10)
 		if err != nil {
 			return nil, err
 		}
 		fmt.Printf("received %d bytes over the network\n", n)
 		fmt.Println(string(fileBuffer.Bytes()))
 	}
+	
+
+	
 
 	select {}
 
@@ -130,6 +136,8 @@ func (f *FileServer) loop() {
 					log.Println("handle message error: ", err)
 				}
 
+				//time.Sleep(time.Second * 3)
+
 				// fmt.Printf("received: %+v\n", msg)
 				// peer, ok := f.peers[rpc.From]
 				// if !ok {
@@ -153,7 +161,9 @@ func (f *FileServer) handleMessage(from string,msg *Message) error {
 	case MessageStoreFile:
 		return f.handleMessageStoreFile(from, v)
 	case MessageGetFile:
-		return f.handleMessageGetFile(from, v)
+		err := f.handleMessageGetFile(from, v)
+		fmt.Print("Getting done")
+		return err
 	}
 	return nil
 }
@@ -185,11 +195,16 @@ func (f *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 	if !ok {
 		return fmt.Errorf("peer %s is not present in the map\n", from)
 	}
+	//fmt.Print(peer.RemoteAddr())
+	peer.Send([]byte{p2p.IncomingStream})
+
+	//time.Sleep(time.Second * 3)
 	n, err := io.Copy(peer, r)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("written %d byted over the network to %s\n", n, from)
+	fmt.Printf("written %d bytes over the network to %s\n", n, from)
+	//peer.(*p2p.TCPPeer).Wg.Done()
 	return nil
 }
 
@@ -229,6 +244,7 @@ func (f *FileServer) broadcast(msg *Message) error {
 	}
 
 	for _, peer := range f.peers {
+		peer.Send([]byte{p2p.IncomingMessage})
 		if err := peer.Send(MsgBuf.Bytes()); err != nil {
 			return err
 		}
@@ -279,7 +295,8 @@ func (f *FileServer) Store(key string, r io.Reader) error {
 	//payload := []byte("THIS LARGE FILE")
 
 	for _, peer := range f.peers {
-		n, err := io.Copy(peer, FileBuffer)
+		peer.Send([]byte{p2p.IncomingStream})
+		n, err := io.Copy(FileBuffer, peer)
 		if err != nil {
 			return err
 		}

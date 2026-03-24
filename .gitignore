@@ -28,4 +28,6 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
+query.txt
+
 bin

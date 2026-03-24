@@ -4,7 +4,8 @@ import (
 	//"fmt"
 	"bytes"
 	"fmt"
-	"io"
+	// "fmt"
+	// "io"
 	"log"
 	"time"
 
@@ -40,19 +41,23 @@ func main(){
 	go func() {
 		log.Fatal(s1.Start())	
 	}()
+	time.Sleep(time.Second * 2)
 	go s2.Start()
 	time.Sleep(time.Second * 2)
-	// data := bytes.NewReader([]byte("Some big data file"))
-	// s2.Store("data", data)
-	
-	r, err :=s2.Get("data")
-	if err != nil {
-		fmt.Println(err)
+	for i := 0; i < 10; i++ {
+		data := bytes.NewReader([]byte("Some big data file"))
+		s2.Store(fmt.Sprintf("data_%d", i), data)
+		time.Sleep(time.Millisecond * 5)
 	}
-	buf := new(bytes.Buffer)
-	io.Copy(buf, r)
-	fmt.Println(string(buf.Bytes()))
 	select{}
+	// r, err :=s2.Get("data")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// buf := new(bytes.Buffer)
+	// io.Copy(buf, r)
+	// fmt.Println(string(buf.Bytes()))
+	// select{}
 }
 
 

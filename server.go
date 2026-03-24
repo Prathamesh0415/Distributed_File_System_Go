@@ -173,12 +173,18 @@ func (f *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 	if !ok {
 		return fmt.Errorf("peer %s not present in peer map", from)
 	}
+	//tcpPeer := peer.(*p2p.TCPPeer)
+	//fmt.Println("Hello1")
+	//time.Sleep(time.Millisecond * 3)
+	//print("hello")
+	//<-tcpPeer.StreamReady
 	n, err := f.store.Write(msg.Key, io.LimitReader(peer, msg.Size)) 
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%d written to disk \n", n)
-	peer.(*p2p.TCPPeer).Wg.Done()
+	//fmt.Println("Hello2")
+	fmt.Printf("%d bytes written to disk \n", n)
+	peer.CloseStream()
 	return nil 
 }
 
@@ -278,7 +284,7 @@ func (f *FileServer) Store(key string, r io.Reader) error {
 	// 	Payload: p,
 	// })
 
-	
+	// fmt.Println("Hello")
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key: key,
@@ -290,13 +296,18 @@ func (f *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}	
 
-	time.Sleep(time.Second * 3)
+	//fmt.Println("Hello")
+
+	time.Sleep(time.Millisecond * 3)
 
 	//payload := []byte("THIS LARGE FILE")
 
+	fileBytes := FileBuffer.Bytes()
+
 	for _, peer := range f.peers {
 		peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(FileBuffer, peer)
+		n, err := io.Copy(peer, bytes.NewReader(fileBytes))
+		//fmt.Println(peer)
 		if err != nil {
 			return err
 		}
@@ -304,6 +315,7 @@ func (f *FileServer) Store(key string, r io.Reader) error {
 		
 	}
 
+	//select{}
 
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	//"io/fs"
-	"log"
+	//"log"
 	"os"
 	"strings"
 )
@@ -134,23 +134,38 @@ func (s *Store) readStream(key string) (int64, io.ReadCloser, error){
 	
 }
 
-func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
+func (s *Store) openFileForWriting(key string) (*os.File, error) {
 	pathkey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.Pathname)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	fullpathWithRoot := fmt.Sprintf("%s/%s",s.Root, pathkey.Fullpath())
 
-	f, err := os.Create(fullpathWithRoot)
+	return os.Create(fullpathWithRoot)
+	
+} 
+
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+	
+	f, err := s.openFileForWriting(key)
+	n, err := CopyDecrypt(encKey, r, f)
+	if err != nil {	
+		return 0, err
+	}
+	return int64(n), nil
+}
+
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(key)
 	if err != nil {
 		return 0, err
 	}
-	n, err := io.Copy(f, r)
-	if err != nil {
-		return 0, err
-	}
-	log.Printf("%d bytes copied to disk: %s\n", n, fullpathWithRoot);
-	return n, nil
+	return io.Copy(f, r)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// log.Printf("%d bytes copied to disk: %s\n", n, fullpathWithRoot);
+	// return n, nil
 }

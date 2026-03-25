@@ -2,7 +2,7 @@ package main
 
 import (
 	//"fmt"
-	//"bytes"
+	"bytes"
 	"fmt"
 	//"io/ioutil"
 
@@ -26,6 +26,7 @@ func makeServer(listenAddr string, nodes ...string) *FileServer{
 	tcpTransport := p2p.NewTCPTransport(tcpTransportOpts)
 
 	fileServerOpts := FileServerOpts{
+		EncKey: newEncryptionKey(),
 		StorageRoot: listenAddr + "_network",
 		PathTransformFunc: CASPathTransformFunc,
 		Transport: tcpTransport,
@@ -46,25 +47,29 @@ func main(){
 	time.Sleep(time.Second * 2)
 	go s2.Start()
 	time.Sleep(time.Second * 2)
-	// for i := 0; i < 1; i++ {
-	// 	data := bytes.NewReader([]byte("Some big data file"))
-	// 	s2.Store(fmt.Sprintf("data_%d", i), data)
-	// 	time.Sleep(time.Millisecond * 5)
-	// }
-	// select{}
-	r, err := s2.Get("data_0")
-	if err != nil {
-		fmt.Println(err)
+	for i := 0; i < 20; i++ {
+		key := fmt.Sprintf("data_%d", i)
+		data := bytes.NewReader([]byte("Some big data file"))
+		s2.Store(key, data)
+		time.Sleep(time.Millisecond * 500)
+	
+
+		s2.store.Delete(key)
+		// // select{}
+		r, err := s2.Get(key)
+		if err != nil {
+			fmt.Println(err)
+		}
+		buf := new(bytes.Buffer)
+		io.Copy(buf, r)
+		fmt.Println(string(buf.Bytes()))
+		// select{}
+		b, err := io.ReadAll(r)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(string(b))
 	}
-	// buf := new(bytes.Buffer)
-	// io.Copy(buf, r)
-	// fmt.Println(string(buf.Bytes()))
-	// select{}
-	b, err := io.ReadAll(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(b))
 }
 
 

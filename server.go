@@ -18,6 +18,7 @@ import (
 )
 
 type FileServerOpts struct {
+	EncKey			  []byte
 	StorageRoot       string
 	PathTransformFunc PathTransformFunc
 	Transport         p2p.Transport
@@ -93,7 +94,7 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 	for _, peer := range f.peers {
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
-		n, err := f.store.Write(key, io.LimitReader(peer, fileSize))
+		n, err := f.store.WriteDecrypt(f.EncKey, key, io.LimitReader(peer, fileSize))
 		//fileBuffer := new(bytes.Buffer)
 		//fmt.Print("hello 1231")
 		//n, err := io.CopyN(fileBuffer, peer, 18)
@@ -298,7 +299,7 @@ func (f *FileServer) Store(key string, r io.Reader) error {
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key: key,
-			Size: n,
+			Size: n + 16,
 		},
 	}
 
@@ -306,24 +307,46 @@ func (f *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}	
 
+
+	peers := []io.Writer{}
+
+	for _, peer := range f.peers {
+		peers = append(peers, peer)
+	}
+
+	time.Sleep(time.Millisecond * 5)
+
+	mw := io.MultiWriter(peers...)
+	mw.Write([]byte{p2p.IncomingStream})
+	_, err = CopyEncrypt(f.EncKey, FileBuffer, mw)
+	if err != nil {
+		return err
+	}
+
+
+
 	//fmt.Println("Hello")
 
-	time.Sleep(time.Millisecond * 3)
+	
 
 	//payload := []byte("THIS LARGE FILE")
 
-	fileBytes := FileBuffer.Bytes()
+	// fileBytes := FileBuffer.Bytes()
 
-	for _, peer := range f.peers {
-		peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(peer, bytes.NewReader(fileBytes))
-		//fmt.Println(peer)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("%d bytes copied to disk\n", n)
-		
-	}
+	// for _, peer := range f.peers {
+	// 	peer.Send([]byte{p2p.IncomingStream})
+	// 	//fmt.Println(FileBuffer.Bytes())
+	// 	n, err := CopyEncrypt(f.EncKey, FileBuffer, peer)
+	// 	// n, err := io.Copy(peer, bytes.NewReader(fileBytes))
+	// 	// //fmt.Println(peer)
+	// 	// if err != nil {
+	// 	// 	return err
+	// 	// }
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	fmt.Printf("%d bytes copied to disk\n", n)
+	// }
 
 	//select{}
 

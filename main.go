@@ -57,7 +57,7 @@ func main(){
 		data := bytes.NewReader([]byte("Some big data file"))
 		s3.Store(key, data)
 		time.Sleep(time.Millisecond * 500)
-		s3.store.Delete(key)
+		s3.store.Delete(s3.ID, key)
 		// // select{}
 		r, err := s3.Get(key)
 		if err != nil {

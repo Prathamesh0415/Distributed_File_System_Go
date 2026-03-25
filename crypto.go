@@ -3,10 +3,23 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
+	"encoding/hex"
 	"io"
-	"fmt"
+	//	"fmt"
 )
+
+func generateId() string {
+	buf := make([]byte, 32)
+	io.ReadFull(rand.Reader, buf)
+	return hex.EncodeToString(buf[:])
+}
+
+func hashKey(key string) string {
+	hash := md5.Sum([]byte(key))
+	return hex.EncodeToString(hash[:])
+}
 
 func newEncryptionKey() []byte {
 	keyBuf := make([]byte, 32)
@@ -14,24 +27,11 @@ func newEncryptionKey() []byte {
 	return keyBuf
 }
 
-func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error){
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return 0, err
-	}
-	iv := make([]byte, block.BlockSize())
-	if _, err := src.Read(iv); err != nil {
-		return 0, err
-	}
-	
+func streamContent(stream cipher.Stream, blockSize int, src io.Reader, dst io.Writer) (int, error) {
 	var (
 		buf = make([]byte, 32 * 1024)
-		stream = cipher.NewCTR(block, iv)
-		nw = block.BlockSize()
+		nw = blockSize
 	)
-
-	fmt.Println(nw)
-
 	for {
 		n, err := src.Read(buf)
 		if n > 0 {
@@ -52,6 +52,21 @@ func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error){
 	return nw, nil
 }
 
+func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error){
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return 0, err
+	}
+	iv := make([]byte, block.BlockSize())
+	if _, err := src.Read(iv); err != nil {
+		return 0, err
+	}
+
+	stream := cipher.NewCTR(block, iv)
+	
+	return streamContent(stream, block.BlockSize(), src, dst) 
+}
+
 func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error){
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -66,25 +81,7 @@ func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error){
 		return 0, err
 	}
 
-	var (
-		buf = make([]byte, 32 * 1024)
-		stream = cipher.NewCTR(block, iv)
-	)
+	stream := cipher.NewCTR(block, iv)	
 
-	for {
-		n, err := src.Read(buf)
-		if n > 0 {
-			stream.XORKeyStream(buf, buf[:n])
-			if _, err := dst.Write(buf[:n]); err != nil {
-				return 0, err
-			}
-		}
-		if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return 0, err
-			}
-	}
-	return 0, nil
+	return streamContent(stream, block.BlockSize(), src, dst)
 }

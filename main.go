@@ -2,10 +2,12 @@ package main
 
 import (
 	//"fmt"
-	"bytes"
+	//"bytes"
 	"fmt"
+	//"io/ioutil"
+
 	// "fmt"
-	// "io"
+	"io"
 	"log"
 	"time"
 
@@ -44,20 +46,25 @@ func main(){
 	time.Sleep(time.Second * 2)
 	go s2.Start()
 	time.Sleep(time.Second * 2)
-	for i := 0; i < 10; i++ {
-		data := bytes.NewReader([]byte("Some big data file"))
-		s2.Store(fmt.Sprintf("data_%d", i), data)
-		time.Sleep(time.Millisecond * 5)
-	}
-	select{}
-	// r, err :=s2.Get("data")
-	// if err != nil {
-	// 	fmt.Println(err)
+	// for i := 0; i < 1; i++ {
+	// 	data := bytes.NewReader([]byte("Some big data file"))
+	// 	s2.Store(fmt.Sprintf("data_%d", i), data)
+	// 	time.Sleep(time.Millisecond * 5)
 	// }
+	// select{}
+	r, err := s2.Get("data_0")
+	if err != nil {
+		fmt.Println(err)
+	}
 	// buf := new(bytes.Buffer)
 	// io.Copy(buf, r)
 	// fmt.Println(string(buf.Bytes()))
 	// select{}
+	b, err := io.ReadAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(b))
 }
 
 

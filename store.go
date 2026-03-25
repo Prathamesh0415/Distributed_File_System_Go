@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	//"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -106,22 +106,32 @@ func (s *Store) Delete(key string) error {
 	return os.RemoveAll(firstPathnameWithRoot)
 }
 
-func (s *Store) Read(key string) (io.Reader, error){
-	f, err := s.readStream(key)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func (s *Store) Read(key string) (int64, io.Reader, error){
+	return s.readStream(key)
+	// n, f, err := s.readStream(key)
+	// if err != nil {
+	// 	return 0, nil, err
+	// }
+	// defer f.Close()
 
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, f)
-	return buf, err
+	// buf := new(bytes.Buffer)
+	// _, err = io.Copy(buf, f)
+	// return n, buf, err
 }
 
-func (s *Store) readStream(key string) (r io.ReadCloser, err error){
+func (s *Store) readStream(key string) (int64, io.ReadCloser, error){
 	pathkey := s.PathTransformFunc(key)
 	fullpathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.Fullpath())
-	return os.Open(fullpathWithRoot)
+	file, err := os.Open(fullpathWithRoot)
+	if err != nil {
+		return 0, nil, err
+	}
+	fi, err := file.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+	return fi.Size(), file, nil
+	
 }
 
 func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
